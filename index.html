@@ -1,73 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YT Explorer</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #fff; }
-    header {
-      display: flex; gap: 10px; padding: 16px; background: #1a1a1a;
-      position: sticky; top: 0; z-index: 100;
-    }
-    header input {
-      flex: 1; padding: 12px; border-radius: 24px; border: 1px solid #333;
-      background: #121212; color: #fff; font-size: 16px;
-    }
-    header button {
-      padding: 12px 24px; border: none; border-radius: 24px;
-      background: #ff0000; color: #fff; font-weight: bold; cursor: pointer;
-    }
-    main { padding: 20px; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-    }
-    .card {
-      background: #1a1a1a; border-radius: 12px; overflow: hidden;
-      cursor: pointer; transition: transform 0.2s;
-    }
-    .card:hover { transform: scale(1.02); }
-    .card img { width: 100%; display: block; }
-    .card .info { padding: 12px; }
-    .card h3 { font-size: 16px; margin-bottom: 6px; }
-    .card p { font-size: 14px; color: #aaa; }
-    .channel-link {
-      color: #3ea6ff; cursor: pointer; text-decoration: underline;
-      font-size: 14px;
-    }
-    .hidden { display: none !important; }
-    #channelView { padding: 20px; }
-    #backBtn {
-      margin-bottom: 16px; padding: 8px 16px; background: #333;
-      border: none; border-radius: 8px; color: #fff; cursor: pointer;
-    }
-    .channel-header {
-      display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
-    }
-    .channel-header img {
-      width: 80px; height: 80px; border-radius: 50%;
-    }
-    .modal {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.9);
-      display: flex; align-items: center; justify-content: center; z-index: 200;
-    }
-    .modal-content {
-      width: 90%; max-width: 1000px; aspect-ratio: 16/9;
-      background: #000; position: relative; border-radius: 12px;
-      overflow: hidden;
-    }
-    .modal-content iframe {
-      width: 100%; height: 100%; border: none;
-    }
-    .close {
-      position: absolute; top: -40px; right: 0; color: #fff;
-      font-size: 32px; cursor: pointer; line-height: 1;
-    }
-    .error { color: #ff6b6b; padding: 20px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>YT Explorer — Custom Player</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #fff; }
+  header {
+    display: flex; gap: 10px; padding: 16px; background: #1a1a1a;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header input {
+    flex: 1; padding: 12px; border-radius: 24px; border: 1px solid #333;
+    background: #121212; color: #fff; font-size: 16px;
+  }
+  header button {
+    padding: 12px 24px; border: none; border-radius: 24px;
+    background: #ff0000; color: #fff; font-weight: bold; cursor: pointer;
+  }
+  main { padding: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: #1a1a1a; border-radius: 12px; overflow: hidden;
+    cursor: pointer; transition: transform 0.2s;
+  }
+  .card:hover { transform: scale(1.02); }
+  .card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
+  .card .info { padding: 12px; }
+  .card h3 { font-size: 15px; margin-bottom: 6px; line-height: 1.3; }
+  .card p { font-size: 13px; color: #aaa; }
+  .channel-link {
+    color: #3ea6ff; cursor: pointer; text-decoration: underline; font-size: 13px;
+  }
+  .hidden { display: none !important; }
+  #channelView { padding: 20px; }
+  #backBtn {
+    margin-bottom: 16px; padding: 8px 16px; background: #333;
+    border: none; border-radius: 8px; color: #fff; cursor: pointer;
+  }
+  .channel-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .channel-header img { width: 80px; height: 80px; border-radius: 50%; }
+
+  /* Custom player modal */
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 20px;
+  }
+  .modal-content {
+    width: 100%; max-width: 1100px; background: #000;
+    border-radius: 12px; overflow: hidden; position: relative;
+  }
+  .modal video {
+    width: 100%; display: block; background: #000; max-height: 80vh;
+  }
+  .modal-meta { padding: 14px 18px; background: #111; }
+  .modal-meta h2 { font-size: 18px; margin-bottom: 6px; }
+  .modal-meta p { color: #aaa; font-size: 13px; }
+  .close {
+    position: absolute; top: 10px; right: 14px; color: #fff;
+    font-size: 30px; cursor: pointer; z-index: 10;
+    text-shadow: 0 0 6px #000;
+  }
+  .error { color: #ff6b6b; padding: 20px; }
+  .loading { padding: 20px; color: #aaa; }
+</style>
 </head>
 <body>
 
@@ -89,33 +91,56 @@
 <div id="videoModal" class="modal hidden">
   <div class="modal-content">
     <span class="close" onclick="closeVideo()">&times;</span>
-    <iframe id="videoFrame" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <video id="player" controls playsinline></video>
+    <div class="modal-meta">
+      <h2 id="playerTitle"></h2>
+      <p id="playerChannel"></p>
+    </div>
   </div>
 </div>
 
 <script>
-  // 🔑 Replace with your own YouTube Data API v3 key
-  const API_KEY = 'AIzaSyATQTCotTClJhv4bbUQFh6k3Nh_Y9MLWSw';
-  const BASE = 'https://www.googleapis.com/youtube/v3';
+  // ================================================================
+  // CONFIG
+  // ================================================================
+  const API_KEY = 'AIzaSyATQTCotTClJhv4bbUQFh6k3Nh_Y9MLWSw';           // for search/channels
+  const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
-  const searchInput = document.getElementById('searchInput');
-  const searchBtn = document.getElementById('searchBtn');
-  const resultsDiv = document.getElementById('results');
-  const channelView = document.getElementById('channelView');
-  const channelInfo = document.getElementById('channelInfo');
-  const channelVideos = document.getElementById('channelVideos');
-  const backBtn = document.getElementById('backBtn');
-  const videoModal = document.getElementById('videoModal');
-  const videoFrame = document.getElementById('videoFrame');
+  // Piped instance for stream extraction. Swap if this one breaks.
+  // List: https://github.com/TeamPiped/Piped/wiki/Instances
+  const PIPED_INSTANCES = [
+    'https://pipedapi.kavin.rocks',
+    'https://pipedapi.adminforge.de',
+    'https://api.piped.private.coffee',
+    'https://pipedapi.reallyaweso.me'
+  ];
 
-  // Search videos
+  // ================================================================
+  // ELEMENTS
+  // ================================================================
+  const searchInput  = document.getElementById('searchInput');
+  const searchBtn    = document.getElementById('searchBtn');
+  const resultsDiv   = document.getElementById('results');
+  const channelView  = document.getElementById('channelView');
+  const channelInfo  = document.getElementById('channelInfo');
+  const channelVideos= document.getElementById('channelVideos');
+  const backBtn      = document.getElementById('backBtn');
+  const videoModal   = document.getElementById('videoModal');
+  const player       = document.getElementById('player');
+  const playerTitle  = document.getElementById('playerTitle');
+  const playerChannel= document.getElementById('playerChannel');
+
+  // ================================================================
+  // SEARCH (uses YouTube Data API — needs key)
+  // ================================================================
   async function searchVideos(query) {
     if (!query.trim()) return;
-    resultsDiv.innerHTML = '<p>Loading...</p>';
+    resultsDiv.innerHTML = '<p class="loading">Loading...</p>';
     channelView.classList.add('hidden');
+    resultsDiv.classList.remove('hidden');
     try {
       const res = await fetch(
-        `${BASE}/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&key=${API_KEY}`
+        `${YT_BASE}/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&key=${API_KEY}`
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
@@ -125,7 +150,9 @@
     }
   }
 
-  // Render video cards
+  // ================================================================
+  // RENDER VIDEO CARDS
+  // ================================================================
   function renderVideos(items, container) {
     container.innerHTML = '';
     if (!items || items.length === 0) {
@@ -133,59 +160,55 @@
       return;
     }
     items.forEach(item => {
-      const videoId = item.id.videoId || item.snippet.resourceId.videoId;
-      const title = item.snippet.title;
-      const thumb = item.snippet.thumbnails.medium.url;
-      const channelTitle = item.snippet.channelTitle;
-      const channelId = item.snippet.channelId;
+      const videoId    = item.id.videoId || item.snippet.resourceId.videoId;
+      const title      = item.snippet.title;
+      const thumb      = item.snippet.thumbnails.medium.url;
+      const chanTitle  = item.snippet.channelTitle;
+      const chanId     = item.snippet.channelId;
 
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = `
-        <img src="${thumb}" alt="${title}" onclick="openVideo('${videoId}')">
+        <img src="${thumb}" alt="${title}" onclick="openVideo('${videoId}', \`${title.replace(/`/g,'')}\`, \`${chanTitle.replace(/`/g,'')}\`)">
         <div class="info">
-          <h3 onclick="openVideo('${videoId}')">${title}</h3>
-          <p>
-            <span class="channel-link" onclick="event.stopPropagation(); openChannel('${channelId}')">
-              ${channelTitle}
-            </span>
-          </p>
+          <h3 onclick="openVideo('${videoId}', \`${title.replace(/`/g,'')}\`, \`${chanTitle.replace(/`/g,'')}\`)">${title}</h3>
+          <p><span class="channel-link" onclick="event.stopPropagation(); openChannel('${chanId}')">${chanTitle}</span></p>
         </div>
       `;
       container.appendChild(card);
     });
   }
 
-  // Open channel view
+  // ================================================================
+  // CHANNEL VIEW
+  // ================================================================
   async function openChannel(channelId) {
     resultsDiv.classList.add('hidden');
     channelView.classList.remove('hidden');
-    channelInfo.innerHTML = '<p>Loading channel...</p>';
+    channelInfo.innerHTML = '<p class="loading">Loading channel...</p>';
     channelVideos.innerHTML = '';
 
     try {
-      // Get channel details
       const chRes = await fetch(
-        `${BASE}/channels?part=snippet,contentDetails&id=${channelId}&key=${API_KEY}`
+        `${YT_BASE}/channels?part=snippet,contentDetails&id=${channelId}&key=${API_KEY}`
       );
       const chData = await chRes.json();
       if (chData.error) throw new Error(chData.error.message);
       const channel = chData.items[0];
-      const uploadsPlaylist = channel.contentDetails.relatedPlaylists.uploads;
+      const uploads = channel.contentDetails.relatedPlaylists.uploads;
 
       channelInfo.innerHTML = `
         <div class="channel-header">
           <img src="${channel.snippet.thumbnails.default.url}" alt="avatar">
           <div>
             <h2>${channel.snippet.title}</h2>
-            <p>${channel.snippet.description || ''}</p>
+            <p style="color:#aaa;font-size:13px">${channel.snippet.description || ''}</p>
           </div>
         </div>
       `;
 
-      // Get channel videos from uploads playlist
       const vidRes = await fetch(
-        `${BASE}/playlistItems?part=snippet&playlistId=${uploadsPlaylist}&maxResults=12&key=${API_KEY}`
+        `${YT_BASE}/playlistItems?part=snippet&playlistId=${uploads}&maxResults=12&key=${API_KEY}`
       );
       const vidData = await vidRes.json();
       if (vidData.error) throw new Error(vidData.error.message);
@@ -195,32 +218,73 @@
     }
   }
 
-  // Open video modal
-  function openVideo(videoId) {
-    videoFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+  // ================================================================
+  // CUSTOM PLAYER — get stream from Piped, play in <video>
+  // ================================================================
+  async function openVideo(videoId, title, channel) {
+    playerTitle.textContent   = title || '';
+    playerChannel.textContent = channel || '';
     videoModal.classList.remove('hidden');
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+
+    // Try each Piped instance until one returns a stream
+    for (const instance of PIPED_INSTANCES) {
+      try {
+        const res = await fetch(`${instance}/streams/${videoId}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        // Prefer highest quality MP4 video stream with audio
+        const streams = (data.videoStreams || []).filter(
+          s => s.videoOnly === false && s.mimeType && s.mimeType.includes('mp4')
+        );
+        if (!streams.length) continue;
+
+        // Sort by quality height, descending
+        streams.sort((a, b) => (b.height || 0) - (a.height || 0));
+        const best = streams[0];
+
+        player.src = best.url;
+        player.load();
+        player.play().catch(() => {});
+        return;
+      } catch (e) {
+        // try next instance
+      }
+    }
+
+    playerTitle.textContent = 'Failed to load stream';
+    playerChannel.textContent = 'All Piped instances failed — try a different instance or video.';
   }
 
   function closeVideo() {
-    videoFrame.src = '';
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
     videoModal.classList.add('hidden');
   }
 
-  // Back to search
+  // ================================================================
+  // EVENTS
+  // ================================================================
   backBtn.addEventListener('click', () => {
     channelView.classList.add('hidden');
     resultsDiv.classList.remove('hidden');
   });
 
-  // Event listeners
   searchBtn.addEventListener('click', () => searchVideos(searchInput.value));
   searchInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') searchVideos(searchInput.value);
   });
 
-  // Close modal on background click
   videoModal.addEventListener('click', e => {
     if (e.target === videoModal) closeVideo();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !videoModal.classList.contains('hidden')) closeVideo();
   });
 </script>
 
