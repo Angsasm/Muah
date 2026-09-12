@@ -3,23 +3,28 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>YT Explorer — Custom Player</title>
+<title>YOUTUBE</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #fff; }
+
   header {
     display: flex; gap: 10px; padding: 16px; background: #1a1a1a;
     position: sticky; top: 0; z-index: 100;
   }
   header input {
     flex: 1; padding: 12px; border-radius: 24px; border: 1px solid #333;
-    background: #121212; color: #fff; font-size: 16px;
+    background: #121212; color: #fff; font-size: 16px; outline: none;
   }
+  header input:focus { border-color: #555; }
   header button {
     padding: 12px 24px; border: none; border-radius: 24px;
     background: #ff0000; color: #fff; font-weight: bold; cursor: pointer;
   }
+  header button:hover { background: #cc0000; }
+
   main { padding: 20px; }
+
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -27,24 +32,32 @@
   }
   .card {
     background: #1a1a1a; border-radius: 12px; overflow: hidden;
-    cursor: pointer; transition: transform 0.2s;
+    cursor: pointer; transition: transform 0.15s;
   }
   .card:hover { transform: scale(1.02); }
-  .card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
+  .card img {
+    width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover;
+    background: #000;
+  }
   .card .info { padding: 12px; }
   .card h3 { font-size: 15px; margin-bottom: 6px; line-height: 1.3; }
   .card p { font-size: 13px; color: #aaa; }
   .channel-link {
     color: #3ea6ff; cursor: pointer; text-decoration: underline; font-size: 13px;
   }
+
   .hidden { display: none !important; }
+
   #channelView { padding: 20px; }
   #backBtn {
     margin-bottom: 16px; padding: 8px 16px; background: #333;
     border: none; border-radius: 8px; color: #fff; cursor: pointer;
   }
+  #backBtn:hover { background: #444; }
   .channel-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
-  .channel-header img { width: 80px; height: 80px; border-radius: 50%; }
+  .channel-header img { width: 80px; height: 80px; border-radius: 50%; background: #222; }
+  .channel-header h2 { font-size: 22px; margin-bottom: 4px; }
+  .channel-header p { color: #aaa; font-size: 13px; }
 
   /* Custom player modal */
   .modal {
@@ -57,24 +70,32 @@
     border-radius: 12px; overflow: hidden; position: relative;
   }
   .modal video {
-    width: 100%; display: block; background: #000; max-height: 80vh;
+    width: 100%; display: block; background: #000; max-height: 78vh;
   }
   .modal-meta { padding: 14px 18px; background: #111; }
-  .modal-meta h2 { font-size: 18px; margin-bottom: 6px; }
+  .modal-meta h2 { font-size: 17px; margin-bottom: 6px; line-height: 1.3; }
   .modal-meta p { color: #aaa; font-size: 13px; }
   .close {
     position: absolute; top: 10px; right: 14px; color: #fff;
-    font-size: 30px; cursor: pointer; z-index: 10;
-    text-shadow: 0 0 6px #000;
+    font-size: 32px; cursor: pointer; z-index: 10;
+    text-shadow: 0 0 6px #000; line-height: 1;
   }
+  .close:hover { color: #ff4444; }
+
   .error { color: #ff6b6b; padding: 20px; }
   .loading { padding: 20px; color: #aaa; }
+  .status {
+    position: absolute; top: 10px; left: 14px;
+    background: rgba(0,0,0,0.6); color: #fff;
+    padding: 4px 10px; border-radius: 12px; font-size: 12px;
+    z-index: 10;
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <input id="searchInput" placeholder="Search YouTube..." />
+  <input id="searchInput" placeholder="Search YouTube..." autocomplete="off" />
   <button id="searchBtn">Search</button>
 </header>
 
@@ -91,7 +112,8 @@
 <div id="videoModal" class="modal hidden">
   <div class="modal-content">
     <span class="close" onclick="closeVideo()">&times;</span>
-    <video id="player" controls playsinline></video>
+    <span class="status" id="playerStatus"></span>
+    <video id="player" controls playsinline preload="metadata"></video>
     <div class="modal-meta">
       <h2 id="playerTitle"></h2>
       <p id="playerChannel"></p>
@@ -101,37 +123,48 @@
 
 <script>
   // ================================================================
-  // CONFIG
+  // CONFIG — replace with your YouTube Data API v3 key
   // ================================================================
-  const API_KEY = 'AIzaSyATQTCotTClJhv4bbUQFh6k3Nh_Y9MLWSw';           // for search/channels
+  const API_KEY = 'AIzaSyATQTCotTClJhv4bbUQFh6k3Nh_Y9MLWSw';
   const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
-  // Piped instance for stream extraction. Swap if this one breaks.
-  // List: https://github.com/TeamPiped/Piped/wiki/Instances
+  // Stream extractor instances (tried in order until one works)
+  const INVIDIOUS_INSTANCES = [
+    'https://inv.nadeko.net',
+    'https://invidious.nerdvpn.de',
+    'https://yewtu.be',
+    'https://invidious.f5.si',
+    'https://iv.melmac.space',
+    'https://invidious.privacyredirect.com'
+  ];
+
   const PIPED_INSTANCES = [
     'https://pipedapi.kavin.rocks',
     'https://pipedapi.adminforge.de',
     'https://api.piped.private.coffee',
-    'https://pipedapi.reallyaweso.me'
+    'https://pipedapi.reallyaweso.me',
+    'https://piped-api.lunar.icu',
+    'https://pipedapi.ducks.party'
   ];
 
   // ================================================================
   // ELEMENTS
   // ================================================================
-  const searchInput  = document.getElementById('searchInput');
-  const searchBtn    = document.getElementById('searchBtn');
-  const resultsDiv   = document.getElementById('results');
-  const channelView  = document.getElementById('channelView');
-  const channelInfo  = document.getElementById('channelInfo');
-  const channelVideos= document.getElementById('channelVideos');
-  const backBtn      = document.getElementById('backBtn');
-  const videoModal   = document.getElementById('videoModal');
-  const player       = document.getElementById('player');
-  const playerTitle  = document.getElementById('playerTitle');
-  const playerChannel= document.getElementById('playerChannel');
+  const searchInput   = document.getElementById('searchInput');
+  const searchBtn     = document.getElementById('searchBtn');
+  const resultsDiv    = document.getElementById('results');
+  const channelView   = document.getElementById('channelView');
+  const channelInfo   = document.getElementById('channelInfo');
+  const channelVideos = document.getElementById('channelVideos');
+  const backBtn       = document.getElementById('backBtn');
+  const videoModal    = document.getElementById('videoModal');
+  const player        = document.getElementById('player');
+  const playerTitle   = document.getElementById('playerTitle');
+  const playerChannel = document.getElementById('playerChannel');
+  const playerStatus  = document.getElementById('playerStatus');
 
   // ================================================================
-  // SEARCH (uses YouTube Data API — needs key)
+  // SEARCH
   // ================================================================
   async function searchVideos(query) {
     if (!query.trim()) return;
@@ -151,8 +184,14 @@
   }
 
   // ================================================================
-  // RENDER VIDEO CARDS
+  // RENDER CARDS
   // ================================================================
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function renderVideos(items, container) {
     container.innerHTML = '';
     if (!items || items.length === 0) {
@@ -160,21 +199,30 @@
       return;
     }
     items.forEach(item => {
-      const videoId    = item.id.videoId || item.snippet.resourceId.videoId;
-      const title      = item.snippet.title;
-      const thumb      = item.snippet.thumbnails.medium.url;
-      const chanTitle  = item.snippet.channelTitle;
-      const chanId     = item.snippet.channelId;
+      const videoId   = item.id.videoId || item.snippet.resourceId.videoId;
+      const title     = item.snippet.title;
+      const thumb     = item.snippet.thumbnails.medium.url;
+      const chanTitle = item.snippet.channelTitle;
+      const chanId    = item.snippet.channelId;
+
+      const safeTitle = escapeHtml(title).replace(/'/g, '&#39;');
+      const safeChan  = escapeHtml(chanTitle).replace(/'/g, '&#39;');
 
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = `
-        <img src="${thumb}" alt="${title}" onclick="openVideo('${videoId}', \`${title.replace(/`/g,'')}\`, \`${chanTitle.replace(/`/g,'')}\`)">
+        <img src="${thumb}" alt="" loading="lazy">
         <div class="info">
-          <h3 onclick="openVideo('${videoId}', \`${title.replace(/`/g,'')}\`, \`${chanTitle.replace(/`/g,'')}\`)">${title}</h3>
-          <p><span class="channel-link" onclick="event.stopPropagation(); openChannel('${chanId}')">${chanTitle}</span></p>
+          <h3>${escapeHtml(title)}</h3>
+          <p><span class="channel-link">${escapeHtml(chanTitle)}</span></p>
         </div>
       `;
+      card.querySelector('img').addEventListener('click', () => openVideo(videoId, title, chanTitle));
+      card.querySelector('h3').addEventListener('click', () => openVideo(videoId, title, chanTitle));
+      card.querySelector('.channel-link').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openChannel(chanId);
+      });
       container.appendChild(card);
     });
   }
@@ -199,10 +247,10 @@
 
       channelInfo.innerHTML = `
         <div class="channel-header">
-          <img src="${channel.snippet.thumbnails.default.url}" alt="avatar">
+          <img src="${channel.snippet.thumbnails.default.url}" alt="">
           <div>
-            <h2>${channel.snippet.title}</h2>
-            <p style="color:#aaa;font-size:13px">${channel.snippet.description || ''}</p>
+            <h2>${escapeHtml(channel.snippet.title)}</h2>
+            <p>${escapeHtml(channel.snippet.description || '')}</p>
           </div>
         </div>
       `;
@@ -219,44 +267,74 @@
   }
 
   // ================================================================
-  // CUSTOM PLAYER — get stream from Piped, play in <video>
+  // VIDEO PLAYER — Invidious first, then Piped fallback
   // ================================================================
+  async function tryInvidious(videoId) {
+    for (const instance of INVIDIOUS_INSTANCES) {
+      try {
+        playerStatus.textContent = `Trying Invidious: ${new URL(instance).host}...`;
+        const res = await fetch(`${instance}/api/v1/videos/${videoId}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        // formatStreams = combined audio+video mp4 (easy to play)
+        const streams = (data.formatStreams || [])
+          .filter(s => s.url && s.container === 'mp4')
+          .sort((a, b) => (parseInt(b.resolution) || 0) - (parseInt(a.resolution) || 0));
+
+        if (streams.length) return streams[0].url;
+
+        // Fallback: adaptiveFormats sometimes has playable progressive
+        const adaptive = (data.adaptiveFormats || [])
+          .filter(s => s.url && s.container === 'mp4' && s.audioQuality)
+          .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+        if (adaptive.length) return adaptive[0].url;
+      } catch (e) { /* try next */ }
+    }
+    return null;
+  }
+
+  async function tryPiped(videoId) {
+    for (const instance of PIPED_INSTANCES) {
+      try {
+        playerStatus.textContent = `Trying Piped: ${new URL(instance).host}...`;
+        const res = await fetch(`${instance}/streams/${videoId}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        const streams = (data.videoStreams || [])
+          .filter(s => s.url && !s.videoOnly && s.mimeType && s.mimeType.includes('mp4'))
+          .sort((a, b) => (b.height || 0) - (a.height || 0));
+
+        if (streams.length) return streams[0].url;
+      } catch (e) { /* try next */ }
+    }
+    return null;
+  }
+
   async function openVideo(videoId, title, channel) {
     playerTitle.textContent   = title || '';
     playerChannel.textContent = channel || '';
+    playerStatus.textContent  = 'Resolving stream...';
     videoModal.classList.remove('hidden');
     player.pause();
     player.removeAttribute('src');
     player.load();
 
-    // Try each Piped instance until one returns a stream
-    for (const instance of PIPED_INSTANCES) {
-      try {
-        const res = await fetch(`${instance}/streams/${videoId}`);
-        if (!res.ok) continue;
-        const data = await res.json();
+    let url = await tryInvidious(videoId);
+    if (!url) url = await tryPiped(videoId);
 
-        // Prefer highest quality MP4 video stream with audio
-        const streams = (data.videoStreams || []).filter(
-          s => s.videoOnly === false && s.mimeType && s.mimeType.includes('mp4')
-        );
-        if (!streams.length) continue;
-
-        // Sort by quality height, descending
-        streams.sort((a, b) => (b.height || 0) - (a.height || 0));
-        const best = streams[0];
-
-        player.src = best.url;
-        player.load();
-        player.play().catch(() => {});
-        return;
-      } catch (e) {
-        // try next instance
-      }
+    if (url) {
+      player.src = url;
+      player.load();
+      player.play().catch(() => {});
+      playerStatus.textContent = 'Playing';
+      setTimeout(() => { playerStatus.textContent = ''; }, 2000);
+    } else {
+      playerStatus.textContent = 'Failed';
+      playerTitle.textContent = 'Could not load stream';
+      playerChannel.textContent = 'All Invidious and Piped instances failed. Try a different video or add more instances.';
     }
-
-    playerTitle.textContent = 'Failed to load stream';
-    playerChannel.textContent = 'All Piped instances failed — try a different instance or video.';
   }
 
   function closeVideo() {
@@ -264,6 +342,7 @@
     player.removeAttribute('src');
     player.load();
     videoModal.classList.add('hidden');
+    playerStatus.textContent = '';
   }
 
   // ================================================================
